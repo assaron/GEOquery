@@ -424,7 +424,15 @@ parseGSEMatrix <- function(fname,AnnotGPL=FALSE,destdir=tempdir(),getGPL=TRUE) {
     ## if getGPL is FALSE, skip this and featureData is then a data.frame with no columns
     fd = new("AnnotatedDataFrame",data=data.frame(row.names=rownames(datamat)))
     if(getGPL) {
-        gpl <- getGEO(GPL,AnnotGPL=AnnotGPL,destdir=destdir)
+        gplCacheFile <- file.path(destdir, paste0(GPL, if (AnnotGPL) ".annot" else NULL, ".rda"))
+        if (file.exists(gplCacheFile)) {
+            message(sprintf('Using locally cached version: %s', gplCacheFile))
+            load(gplCacheFile)
+        } else {
+            gpl <- getGEO(GPL,AnnotGPL=AnnotGPL,destdir=destdir)
+            save(gpl, file=gplCacheFile)
+            message(sprintf('Storing parsed GPL at: %s', gplCacheFile))
+        }
         vmd <- Columns(gpl)
         dat <- Table(gpl)
         ## GEO uses "TAG" instead of "ID" for SAGE GSE/GPL entries, but it is apparently
