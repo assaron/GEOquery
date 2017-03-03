@@ -387,37 +387,47 @@ getAndParseGSEMatrices <- function(GEO,destdir,AnnotGPL,getGPL=TRUE) {
 ### Function to parse a single GSEMatrix
 ### file into an ExpressionSet
 parseGSEMatrix <- function(fname,AnnotGPL=FALSE,destdir=tempdir(),getGPL=TRUE) {
-    dat <- readLines(fname)
-    ## get the number of !Series and !Sample lines
-    nseries <- sum(grepl("^!Series_", dat))
-    nsamples <- sum(grepl("^!Sample_", dat))
-    con <- fileOpen(fname)
-    ## Read the !Series_ and !Sample_ lines
-    header <- suppressWarnings(read.table(con,sep="\t",header=FALSE,nrows=nseries))
-    tmpdat <- suppressWarnings(read.table(con,sep="\t",header=FALSE,nrows=nsamples))
-    tmptmp <- t(tmpdat)
-    sampledat <- rbind(data.frame(),tmptmp[-1,])
-    colnames(sampledat) <- make.unique(sub('!Sample_','',as.character(tmpdat[,1])))
-    suppressWarnings(readLines(con,1))
-                                        # used to be able to use colclasses, but some SNP arrays provide only the
-                                        # genotypes in AA AB BB form, so need to switch it up....
-                                        #  colClasses <- c('character',rep('numeric',nrow(sampledat)))
-    datamat <- suppressWarnings(read.delim(con,sep="\t",header=TRUE,
-                                           na.strings=c('NA','null','NULL','Null'),
-                                           comment.char=""))
-    close(con)
-    tmprownames = datamat[,1]
-                                        # need the as.matrix for single-sample or empty GSE
-    datamat <- as.matrix(datamat[!is.na(tmprownames),-1])
-    rownames(datamat) <- tmprownames[!is.na(tmprownames)]
-    ## All the series matrix files are assumed to end with
-    ## the line "!series_matrix_table_end", so we remove
-    ## that line from the datamatrix (it has been read)
-    if(nrow(datamat)==1) {
-        ## empty gse
-        datamat <- datamat[1:(nrow(datamat)-1),]
+    datamatCacheFile <- file.path(destdir, paste0(basename(fname), ".rda"))
+    if (file.exists(datamatCacheFile)) {
+        message(sprintf('Using locally cached version: %s', datamatCacheFile))
+        load(datamatCacheFile)
     } else {
-        datamat <- as.matrix(datamat[1:(nrow(datamat)-1),])
+        dat <- readLines(fname)
+        ## get the number of !Series and !Sample lines
+        nseries <- sum(grepl("^!Series_", dat))
+        nsamples <- sum(grepl("^!Sample_", dat))
+        con <- fileOpen(fname)
+        ## Read the !Series_ and !Sample_ lines
+        header <- suppressWarnings(read.table(con,sep="\t",header=FALSE,nrows=nseries))
+        tmpdat <- suppressWarnings(read.table(con,sep="\t",header=FALSE,nrows=nsamples))
+        tmptmp <- t(tmpdat)
+        sampledat <- rbind(data.frame(),tmptmp[-1,])
+        colnames(sampledat) <- make.unique(sub('!Sample_','',as.character(tmpdat[,1])))
+        suppressWarnings(readLines(con,1))
+                                            # used to be able to use colclasses, but some SNP arrays provide only the
+                                            # genotypes in AA AB BB form, so need to switch it up....
+                                            #  colClasses <- c('character',rep('numeric',nrow(sampledat)))
+        datamat <- suppressWarnings(read.delim(con,sep="\t",header=TRUE,
+                                               na.strings=c('NA','null','NULL','Null'),
+                                               comment.char=""))
+        close(con)
+
+        tmprownames = datamat[,1]
+        # need the as.matrix for single-sample or empty GSE
+        datamat <- as.matrix(datamat[!is.na(tmprownames),-1])
+        rownames(datamat) <- tmprownames[!is.na(tmprownames)]
+        ## All the series matrix files are assumed to end with
+        ## the line "!series_matrix_table_end", so we remove
+        ## that line from the datamatrix (it has been read)
+        if(nrow(datamat)==1) {
+            ## empty gse
+            datamat <- datamat[1:(nrow(datamat)-1),]
+        } else {
+            datamat <- as.matrix(datamat[1:(nrow(datamat)-1),])
+        }
+
+        save(datamat, sampledat, file=datamatCacheFile)
+        message(sprintf('Storing parsed GSE matrix at: %s', datamatCacheFile))
     }
     rownames(sampledat) <- colnames(datamat)
     GPL=as.character(sampledat[1,grep('platform_id',colnames(sampledat),ignore.case=TRUE)])
