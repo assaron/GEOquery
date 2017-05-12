@@ -364,6 +364,7 @@ getAndParseGSEMatrices <- function(GEO,destdir,AnnotGPL,getGPL=TRUE) {
     stub = gsub('\\d{1,3}$','nnn',GEO,perl=TRUE)
     gdsurl <- 'https://ftp.ncbi.nlm.nih.gov/geo/series/%s/%s/matrix/'
     b = getDirListing(sprintf(gdsurl,stub,GEO))
+    b <- grep("^GSE", b, value=T)
     message(sprintf('Found %d file(s)',length(b)))
     ret <- list()
     ## Loop over the files, returning a list, one element
